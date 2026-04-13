@@ -110,6 +110,7 @@
 //  2016-10-15: Misc: Added a void* user_data parameter to Clipboard function handlers.
 
 #include "imgui.h"
+#include "imgui_internal.h"
 #ifndef IMGUI_DISABLE
 #include "imgui_impl_glfw.h"
 
@@ -1303,32 +1304,40 @@ static void ImGui_ImplGlfw_WindowCloseCallback(GLFWwindow* window)
 // - on Linux it is queued and invoked during glfwPollEvents()
 // Because the event doesn't always fire on glfwSetWindowXXX() we use a frame counter tag to only
 // ignore recent glfwSetWindowXXX() calls.
-static void ImGui_ImplGlfw_WindowPosCallback(GLFWwindow* window, int, int)
+static void ImGui_ImplGlfw_WindowPosCallback(GLFWwindow* window, int xpos, int ypos)
 {
     if (ImGuiViewport* viewport = ImGui::FindViewportByPlatformHandle(window))
     {
+        bool ignore_event = false;
         if (ImGui_ImplGlfw_ViewportData* vd = (ImGui_ImplGlfw_ViewportData*)viewport->PlatformUserData)
         {
-            bool ignore_event = (ImGui::GetFrameCount() <= vd->IgnoreWindowPosEventFrame + 1);
+            ignore_event = (ImGui::GetFrameCount() <= vd->IgnoreWindowPosEventFrame + 1);
             //data->IgnoreWindowPosEventFrame = -1;
-            if (ignore_event)
-                return;
         }
+        ImGuiContext& g = *GImGui;
+        const char* suffix = ignore_event ? "ignored" : "respected";
+        IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Callback: ViewPort 0x%08X changed to Pos (%.1f, %.1f) %s\n", viewport->ID, (float)xpos, (float)ypos, suffix);
+        if (ignore_event)
+            return;
         viewport->PlatformRequestMove = true;
     }
 }
 
-static void ImGui_ImplGlfw_WindowSizeCallback(GLFWwindow* window, int, int)
+static void ImGui_ImplGlfw_WindowSizeCallback(GLFWwindow* window, int width, int height)
 {
     if (ImGuiViewport* viewport = ImGui::FindViewportByPlatformHandle(window))
     {
+        bool ignore_event = false;
         if (ImGui_ImplGlfw_ViewportData* vd = (ImGui_ImplGlfw_ViewportData*)viewport->PlatformUserData)
         {
-            bool ignore_event = (ImGui::GetFrameCount() <= vd->IgnoreWindowSizeEventFrame + 1);
+            ignore_event = (ImGui::GetFrameCount() <= vd->IgnoreWindowSizeEventFrame + 1);
             //data->IgnoreWindowSizeEventFrame = -1;
-            if (ignore_event)
-                return;
         }
+        ImGuiContext& g = *GImGui;
+        const char* suffix = ignore_event ? "ignored" : "respected";
+        IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Callback: ViewPort 0x%08X changed to Size (%.1f, %.1f) %s\n", viewport->ID, (float)width, (float)height, suffix);
+        if (ignore_event)
+            return;
         viewport->PlatformRequestResize = true;
     }
 }
@@ -1478,14 +1487,18 @@ static void ImGui_ImplGlfw_ShowWindow(ImGuiViewport* viewport)
 
 static ImVec2 ImGui_ImplGlfw_GetWindowPos(ImGuiViewport* viewport)
 {
+    ImGuiContext& g = *GImGui;
     ImGui_ImplGlfw_ViewportData* vd = (ImGui_ImplGlfw_ViewportData*)viewport->PlatformUserData;
     int x = 0, y = 0;
     glfwGetWindowPos(vd->Window, &x, &y);
+    IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Inspect:  ViewPort 0x%08X placed at  Pos  (%.1f, %.1f)\n", viewport->ID, (float)x, (float)y);
     return ImVec2((float)x, (float)y);
 }
 
 static void ImGui_ImplGlfw_SetWindowPos(ImGuiViewport* viewport, ImVec2 pos)
 {
+    ImGuiContext& g = *GImGui;
+    IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Request:  ViewPort 0x%08X set     to Pos  (%.1f, %.1f)\n", viewport->ID, pos.x, pos.y);
     ImGui_ImplGlfw_ViewportData* vd = (ImGui_ImplGlfw_ViewportData*)viewport->PlatformUserData;
     vd->IgnoreWindowPosEventFrame = ImGui::GetFrameCount();
     glfwSetWindowPos(vd->Window, (int)pos.x, (int)pos.y);
@@ -1493,14 +1506,18 @@ static void ImGui_ImplGlfw_SetWindowPos(ImGuiViewport* viewport, ImVec2 pos)
 
 static ImVec2 ImGui_ImplGlfw_GetWindowSize(ImGuiViewport* viewport)
 {
+    ImGuiContext& g = *GImGui;
     ImGui_ImplGlfw_ViewportData* vd = (ImGui_ImplGlfw_ViewportData*)viewport->PlatformUserData;
     int w = 0, h = 0;
     glfwGetWindowSize(vd->Window, &w, &h);
+    IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Inspect:  ViewPort 0x%08X sized at   Size (%.1f, %.1f)\n", viewport->ID, (float)w, (float)h);
     return ImVec2((float)w, (float)h);
 }
 
 static void ImGui_ImplGlfw_SetWindowSize(ImGuiViewport* viewport, ImVec2 size)
 {
+    ImGuiContext& g = *GImGui;
+    IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Request:  ViewPort 0x%08X set     to Size (%.1f, %.1f)\n", viewport->ID, size.x, size.y);
     ImGui_ImplGlfw_ViewportData* vd = (ImGui_ImplGlfw_ViewportData*)viewport->PlatformUserData;
 #if defined(__APPLE__) && !GLFW_HAS_OSX_WINDOW_POS_FIX
     // Native OS windows are positioned from the bottom-left corner on macOS, whereas on other platforms they are

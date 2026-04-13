@@ -5446,6 +5446,7 @@ void ImGui::UpdateMouseMovingWindowNewFrame()
                 SetWindowPos(moving_window, pos, ImGuiCond_Always);
                 if (moving_window->Viewport && moving_window->ViewportOwned) // Synchronize viewport immediately because some overlays may relies on clipping rectangle before we Begin() into the window.
                 {
+                    IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Pos  (%.1f, %.1f)\n", moving_window->Viewport->ID, pos.x, pos.y);
                     moving_window->Viewport->Pos = pos;
                     moving_window->Viewport->UpdateWorkRect();
                 }
@@ -8336,9 +8337,15 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         if (window->ViewportOwned)
         {
             if (!window->Viewport->PlatformRequestMove)
+            {
+                IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Pos  (%.1f, %.1f)\n", window->Viewport->ID, window->Pos.x, window->Pos.y);
                 window->Viewport->Pos = window->Pos;
+            }
             if (!window->Viewport->PlatformRequestResize)
+            {
+                IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Size (%.1f, %.1f)\n", window->Viewport->ID, window->Size.x, window->Size.y);
                 window->Viewport->Size = window->Size;
+            }
             window->Viewport->UpdateWorkRect();
             viewport_rect = window->Viewport->GetMainRect();
         }
@@ -16629,7 +16636,11 @@ void ImGui::SetWindowViewport(ImGuiWindow* window, ImGuiViewportP* viewport)
 {
     // Abandon viewport
     if (window->ViewportOwned && window->Viewport->Window == window)
+    {
+        ImGuiContext& g = *GImGui;
+        IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Size (%.1f, %.1f)\n", window->Viewport->ID, 0.0f, 0.0f);
         window->Viewport->Size = ImVec2(0.0f, 0.0f);
+    }
 
     window->Viewport = viewport;
     window->ViewportId = viewport->ID;
@@ -16889,9 +16900,17 @@ static void ImGui::UpdateViewportsNewFrame()
             {
                 // Viewport->WorkPos and WorkSize will be updated below
                 if (viewport->PlatformRequestMove)
-                    viewport->Pos = viewport->LastPlatformPos = g.PlatformIO.Platform_GetWindowPos(viewport);
+                {
+                    ImVec2 pos = g.PlatformIO.Platform_GetWindowPos(viewport);
+                    IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Pos  (%.1f, %.1f)\n", viewport->ID, pos.x, pos.y);
+                    viewport->Pos = viewport->LastPlatformPos = pos;
+                }
                 if (viewport->PlatformRequestResize)
-                    viewport->Size = viewport->LastPlatformSize = g.PlatformIO.Platform_GetWindowSize(viewport);
+                {
+                    ImVec2 size = g.PlatformIO.Platform_GetWindowSize(viewport);
+                    IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Size (%.1f, %.1f)\n", viewport->ID, size.x, size.y);
+                    viewport->Size = viewport->LastPlatformSize = size;
+                }
                 if (g.PlatformIO.Platform_GetWindowFramebufferScale != NULL)
                     viewport->FramebufferScale = g.PlatformIO.Platform_GetWindowFramebufferScale(viewport);
             }
@@ -17078,9 +17097,15 @@ ImGuiViewportP* ImGui::AddUpdateViewport(ImGuiWindow* window, ImGuiID id, const 
         ImVec2 prev_pos = viewport->Pos;
         ImVec2 prev_size = viewport->Size;
         if (!viewport->PlatformRequestMove || viewport->ID == IMGUI_VIEWPORT_DEFAULT_ID)
+        {
+            IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Pos  (%.1f, %.1f)\n", viewport->ID, pos.x, pos.y);
             viewport->Pos = pos;
-        if (!viewport->PlatformRequestResize || viewport->ID == IMGUI_VIEWPORT_DEFAULT_ID)
+        }
+        if (viewport->ID == IMGUI_VIEWPORT_DEFAULT_ID)
+        {
+            IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Size (%.1f, %.1f)\n", viewport->ID, size.x, size.y);
             viewport->Size = size;
+        }
         viewport->Flags = flags | (viewport->Flags & (ImGuiViewportFlags_IsMinimized | ImGuiViewportFlags_IsFocused)); // Preserve existing flags
         if (prev_pos != viewport->Pos || prev_size != viewport->Size)
             UpdateViewportPlatformMonitor(viewport);
@@ -17091,7 +17116,9 @@ ImGuiViewportP* ImGui::AddUpdateViewport(ImGuiWindow* window, ImGuiID id, const 
         viewport = IM_NEW(ImGuiViewportP)();
         viewport->ID = id;
         viewport->Idx = g.Viewports.Size;
+        IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Pos  (%.1f, %.1f)\n", viewport->ID, pos.x, pos.y);
         viewport->Pos = viewport->LastPos = pos;
+        IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Size (%.1f, %.1f)\n", window->Viewport->ID, size.x, size.y);
         viewport->Size = viewport->LastSize = size;
         viewport->Flags = flags;
         UpdateViewportPlatformMonitor(viewport);
@@ -17306,6 +17333,7 @@ void ImGui::WindowSyncOwnedViewport(ImGuiWindow* window, ImGuiWindow* parent_win
     else if (memcmp(&window->Viewport->Pos, &window->Pos, sizeof(window->Pos)) != 0)
     {
         viewport_rect_changed = true;
+        IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Pos  (%.1f, %.1f)\n", window->Viewport->ID, window->Pos.x, window->Pos.y);
         window->Viewport->Pos = window->Pos;
     }
 
@@ -17317,6 +17345,7 @@ void ImGui::WindowSyncOwnedViewport(ImGuiWindow* window, ImGuiWindow* parent_win
     else if (memcmp(&window->Viewport->Size, &window->Size, sizeof(window->Size)) != 0)
     {
         viewport_rect_changed = true;
+        IMGUI_DEBUG_LOG_WINDOWMANAGER("[wm] Internal: ViewPort 0x%08X set     to Size (%.1f, %.1f)\n", window->Viewport->ID, window->Size.x, window->Size.y);
         window->Viewport->Size = window->Size;
     }
     window->Viewport->UpdateWorkRect();
@@ -23794,6 +23823,7 @@ void ImGui::ShowDebugLogWindow(bool* p_open)
     ShowDebugLogFlag("Selection", ImGuiDebugLogFlags_EventSelection);
     ShowDebugLogFlag("Viewport", ImGuiDebugLogFlags_EventViewport);
     ShowDebugLogFlag("InputRouting", ImGuiDebugLogFlags_EventInputRouting);
+    ShowDebugLogFlag("WindowManager", ImGuiDebugLogFlags_EventWindowManager);
 
     if (SmallButton("Clear"))
     {
